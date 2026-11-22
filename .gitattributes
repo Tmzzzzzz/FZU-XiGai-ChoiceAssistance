@@ -1,0 +1,14 @@
+# 统一换行符：批处理必须是 CRLF，其余源码用 LF
+* text=auto
+
+*.bat text eol=crlf
+*.cmd text eol=crlf
+*.ps1 text eol=crlf
+*.py text eol=lf
+*.md text eol=lf
+*.json text eol=lf
+*.txt text eol=lf
+
+*.png binary
+*.ico binary
+*.exe binary

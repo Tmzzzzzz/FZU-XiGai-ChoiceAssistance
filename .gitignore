@@ -1,0 +1,13 @@
+# 虚拟环境与缓存
+.venv/
+__pycache__/
+*.pyc
+
+# 本地进度与开发产物
+userdata/
+tests/_smoke_progress.json
+_dev/
+logs/
+build/
+dist/
+assets/_tmp_*.png
