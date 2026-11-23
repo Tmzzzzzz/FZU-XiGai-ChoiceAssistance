@@ -15,6 +15,7 @@ class Sidebar(QWidget):
     modeChanged = Signal(str)
     filtersChanged = Signal()
     restartRequested = Signal()
+    shuffleRequested = Signal()
 
     def __init__(self, session: QuizSession, parent=None):
         super().__init__(parent)
@@ -113,10 +114,22 @@ class Sidebar(QWidget):
         lay.addStretch(1)
 
         self.restart_btn = QPushButton("↻　重新开始本轮")
-        self.restart_btn.setObjectName("link")
+        self.restart_btn.setObjectName("ghost")
         self.restart_btn.setCursor(Qt.PointingHandCursor)
+        self.restart_btn.setToolTip("按最新掌握度重排，并从第一题重新开始；统计保留")
         self.restart_btn.clicked.connect(self.restartRequested.emit)
-        lay.addWidget(self.restart_btn, 0, Qt.AlignHCenter)
+
+        self.shuffle_btn = QPushButton("⇄　打乱并重新开始")
+        self.shuffle_btn.setObjectName("ghost")
+        self.shuffle_btn.setCursor(Qt.PointingHandCursor)
+        self.shuffle_btn.setToolTip("重新洗牌后从第一题开始；统计保留")
+        self.shuffle_btn.clicked.connect(self.shuffleRequested.emit)
+
+        btns = QVBoxLayout()
+        btns.setSpacing(6)
+        btns.addWidget(self.restart_btn)
+        btns.addWidget(self.shuffle_btn)
+        lay.addLayout(btns)
 
         self._fill_static_items()
         self.refresh()

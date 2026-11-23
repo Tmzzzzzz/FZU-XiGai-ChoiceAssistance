@@ -274,7 +274,32 @@ def main():
     assert w.session.stats().attempted >= 1
     ok("重新开始本轮清空作答状态，统计保留")
 
-    print("[17] 重置")
+    print("[17] 快捷键与打乱按钮")
+    from PySide6.QtCore import Qt as _Qt
+    from PySide6.QtTest import QTest
+    w.activateWindow()
+    app.processEvents()
+    w.session.index = 0
+    w._render()
+    app.processEvents()
+    QTest.keyClick(w, _Qt.Key_B)
+    app.processEvents()
+    assert "B" in w.view._chosen, w.view._chosen
+    before = list(w.session.queue[:6])
+    QTest.keyClick(w, _Qt.Key_R)
+    app.processEvents()
+    assert w.session.queue[:6] != before
+    ok("A–E 选选项、R 打乱队列都生效")
+
+    w.session.round_done.add("dummy")
+    before = list(w.session.queue[:6])
+    w.sidebar.shuffle_btn.click()
+    app.processEvents()
+    assert not w.session.round_done and w.session.index == 0
+    assert w.session.queue[:6] != before
+    ok("侧栏「打乱并重新开始」清空本轮并重排")
+
+    print("[18] 重置")
     w.store.reset()
     w.session.rebuild(keep_current=False)
     w._refresh_all()

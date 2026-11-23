@@ -212,6 +212,7 @@ class MainWindow(QMainWindow):
         self.sidebar.modeChanged.connect(self._on_mode)
         self.sidebar.filtersChanged.connect(self._on_filters)
         self.sidebar.restartRequested.connect(self._restart_round)
+        self.sidebar.shuffleRequested.connect(self._shuffle_restart)
         self.view.submitted.connect(self._on_submit)
         self.view.nextRequested.connect(self._on_next)
         self.view.prevRequested.connect(self._on_prev)
@@ -220,17 +221,29 @@ class MainWindow(QMainWindow):
         self.insights.resetRequested.connect(self._reset_progress)
 
     def _bind_shortcuts(self) -> None:
-        for key in ["A", "B", "C", "D", "E"]:
-            QShortcut(QKeySequence(key), self, activated=lambda k=key: self.view.toggle_key(k))
-            QShortcut(QKeySequence(key.lower()), self, activated=lambda k=key: self.view.toggle_key(k))
-        for i, key in enumerate(["A", "B", "C", "D", "E"], start=1):
-            QShortcut(QKeySequence(str(i)), self, activated=lambda k=key: self.view.toggle_key(k))
-        QShortcut(QKeySequence(Qt.Key_Return), self, activated=self._enter)
-        QShortcut(QKeySequence(Qt.Key_Enter), self, activated=self._enter)
-        QShortcut(QKeySequence(Qt.Key_Left), self, activated=self._on_prev)
-        QShortcut(QKeySequence(Qt.Key_Right), self, activated=self._on_next)
-        QShortcut(QKeySequence("R"), self, activated=self._shuffle)
-        QShortcut(QKeySequence("r"), self, activated=self._shuffle)
+        """显式创建并连接（PySide6 的 QShortcut 不接受 activated= 关键字）。"""
+        self._shortcuts: list[QShortcut] = []
+
+        def bind(sequence, handler) -> None:
+            shortcut = QShortcut(sequence if isinstance(sequence, QKeySequence)
+                                 else QKeySequence(sequence), self)
+            shortcut.activated.connect(handler)
+            self._shortcuts.append(shortcut)
+
+        def bind_letter(name: str, handler) -> None:
+            code = getattr(Qt, f"Key_{name}").value
+            bind(QKeySequence(code), handler)
+            bind(QKeySequence(code | Qt.ShiftModifier.value), handler)  # 大写 / 开 CapsLock
+
+        for key in ("A", "B", "C", "D", "E"):
+            bind_letter(key, lambda k=key: self.view.toggle_key(k))
+        for i, key in enumerate(("A", "B", "C", "D", "E"), start=1):
+            bind(str(i), lambda k=key: self.view.toggle_key(k))
+        bind("Return", self._enter)
+        bind("Enter", self._enter)
+        bind("Left", self._on_prev)
+        bind("Right", self._on_next)
+        bind_letter("R", self._shuffle)
 
     # ---------------------------------------------------------------- 流程
     def _enter(self) -> None:
@@ -299,6 +312,14 @@ class MainWindow(QMainWindow):
     def _restart_round(self) -> None:
         # 重新排序：掌握度、错题次数都按最新记录重算；本轮已答状态清空
         self.session.rebuild(keep_current=False, new_round=True)
+        self._render()
+        self.insights.refresh()
+        self.sidebar.refresh()
+
+    def _shuffle_restart(self) -> None:
+        """打乱顺序并从第一题重新开始（统计保留）。"""
+        self.session.rebuild(keep_current=False, new_round=True)
+        self.session.reshuffle()
         self._render()
         self.insights.refresh()
         self.sidebar.refresh()
