@@ -142,8 +142,13 @@ DARK = {
     "SUN": "#F0BE69",
 }
 
+FONT_SCALES = {"small": 0.88, "medium": 1.0, "large": 1.16}
+FONT_LABELS = {"small": "小", "medium": "中", "large": "大"}
+
 _current = dict(LIGHT)
 _mode = "light"
+_font_scale = 1.0
+_font_level = "medium"
 _shadows: list[tuple[weakref.ref, QGraphicsDropShadowEffect, int]] = []
 
 
@@ -153,6 +158,20 @@ def mode() -> str:
 
 def is_dark() -> bool:
     return _mode == "dark"
+
+
+def font_level() -> str:
+    return _font_level
+
+
+def font_scale() -> float:
+    return _font_scale
+
+
+def set_font_scale(level: str) -> None:
+    global _font_scale, _font_level
+    _font_level = level if level in FONT_SCALES else "medium"
+    _font_scale = FONT_SCALES[_font_level]
 
 
 def set_mode(value: str) -> None:
@@ -194,7 +213,7 @@ def app_palette() -> QPalette:
 def base_font(size: int = 10, weight: int = 400) -> QFont:
     f = QFont()
     f.setFamilies([FONT_FAMILY, "Microsoft YaHei", "Segoe UI", "PingFang SC"])
-    f.setPointSize(size)
+    f.setPointSizeF(size * _font_scale)
     f.setWeight(QFont.Weight(weight))
     f.setHintingPreference(QFont.HintingPreference.PreferDefaultHinting)
     return f
@@ -231,11 +250,16 @@ def refresh_shadows() -> None:
 # ------------------------------------------------------------------ 样式表
 def qss() -> str:
     p = _current
+
+    def fs(value: float) -> str:
+        scaled = round(value * _font_scale, 1)
+        return (f"{scaled:.1f}").rstrip("0").rstrip(".")
+
     return f"""
     QWidget {{
         color: {p['TEXT']};
         font-family: "{FONT_FAMILY}", "Microsoft YaHei", "Segoe UI";
-        font-size: 10pt;
+        font-size: {fs(10)}pt;
     }}
     QMainWindow, QWidget#root {{ background: {p['BG']}; }}
     QWidget#sidebar {{ background: {p['SURFACE']}; border-right: 1px solid {p['BORDER']}; }}
@@ -252,31 +276,34 @@ def qss() -> str:
     }}
     QFrame#hline {{ background: {p['BORDER']}; border: none; max-height: 1px; min-height: 1px; }}
 
-    QLabel#brandTitle {{ font-size: 19pt; font-weight: 700; color: {p['TEXT']}; }}
-    QLabel#brandSub {{ color: {p['MUTED']}; font-size: 9pt; }}
+    QLabel#brandTitle {{ font-size: {fs(19)}pt; font-weight: 700; color: {p['TEXT']}; }}
+    QLabel#brandSub {{ color: {p['MUTED']}; font-size: {fs(9)}pt; }}
     QLabel#sectionLabel {{
-        color: {p['MUTED']}; font-size: 9pt; font-weight: 600;
+        color: {p['MUTED']}; font-size: {fs(9)}pt; font-weight: 600;
         letter-spacing: 0.6px;
     }}
-    QLabel#stem {{ font-size: 13pt; color: {p['TEXT']}; }}
-    QLabel#qmeta {{ color: {p['MUTED']}; font-size: 9pt; }}
-    QLabel#hint {{ color: {p['MUTED']}; font-size: 9pt; }}
-    QLabel#feedbackTitle {{ font-size: 11pt; font-weight: 700; }}
+    QLabel#stem {{ font-size: {fs(13)}pt; color: {p['TEXT']}; }}
+    QLabel#qmeta {{ color: {p['MUTED']}; font-size: {fs(9)}pt; }}
+    QLabel#hint {{ color: {p['MUTED']}; font-size: {fs(9)}pt; }}
+    QLabel#feedbackTitle {{ font-size: {fs(11)}pt; font-weight: 700; }}
     QLabel#feedbackTitle[result="ok"] {{ color: {p['SUCCESS']}; }}
     QLabel#feedbackTitle[result="bad"] {{ color: {p['DANGER']}; }}
-    QLabel#feedbackLine {{ color: {p['TEXT_SECOND']}; font-size: 9.5pt; }}
-    QLabel#explainTitle {{ color: {p['MUTED']}; font-size: 9pt; font-weight: 600; }}
-    QLabel#explainText {{ color: {p['TEXT_SECOND']}; font-size: 10pt; }}
-    QLabel#bigNum {{ font-size: 20pt; font-weight: 700; color: {p['TEXT']}; }}
-    QLabel#tileName {{ color: {p['MUTED']}; font-size: 9pt; }}
-    QLabel#emptyTitle {{ color: {p['TEXT_SECOND']}; font-size: 12pt; font-weight: 600; }}
-    QLabel#emptyText {{ color: {p['MUTED']}; font-size: 9.5pt; }}
+    QLabel#feedbackLine {{ color: {p['TEXT_SECOND']}; font-size: {fs(9.5)}pt; }}
+    QLabel#explainTitle {{ color: {p['MUTED']}; font-size: {fs(9)}pt; font-weight: 600; }}
+    QLabel#explainText {{ color: {p['TEXT_SECOND']}; font-size: {fs(10)}pt; }}
+    QLabel#scheduleText {{ color: {p['MUTED']}; font-size: {{fs(9)}}pt; }}
+    QLabel#glossaryTerm {{ color: {p['PRIMARY_DARK']}; font-size: {fs(9.5)}pt; font-weight: 600; }}
+    QLabel#glossaryText {{ color: {p['TEXT_SECOND']}; font-size: {fs(9.5)}pt; }}
+    QLabel#bigNum {{ font-size: {fs(20)}pt; font-weight: 700; color: {p['TEXT']}; }}
+    QLabel#tileName {{ color: {p['MUTED']}; font-size: {fs(9)}pt; }}
+    QLabel#emptyTitle {{ color: {p['TEXT_SECOND']}; font-size: {fs(12)}pt; font-weight: 600; }}
+    QLabel#emptyText {{ color: {p['MUTED']}; font-size: {fs(9.5)}pt; }}
     QLabel#emptyMark {{
         background: {p['SURFACE_SOFT']};
         border: 1px solid {p['BORDER']};
         border-radius: 23px;
         color: {p['MUTED']};
-        font-size: 16pt;
+        font-size: {fs(16)}pt;
         font-weight: 700;
     }}
     QLabel#fbNote {{
@@ -290,7 +317,7 @@ def qss() -> str:
     QLabel#chip {{
         border-radius: 9px;
         padding: 0px 10px;
-        font-size: 9pt;
+        font-size: {fs(9)}pt;
         background: {p['SURFACE_SOFT']};
         color: {p['TEXT_SECOND']};
         border: 1px solid {p['BORDER']};
@@ -311,7 +338,7 @@ def qss() -> str:
     QFrame#segment {{ background: {p['SURFACE_SOFT']}; border: 1px solid {p['BORDER']}; border-radius: 13px; }}
     QPushButton#segBtn {{
         background: transparent; border: none; border-radius: 10px;
-        padding: 7px 6px; color: {p['TEXT_SECOND']}; font-size: 9.5pt;
+        padding: 7px 6px; color: {p['TEXT_SECOND']}; font-size: {fs(9.5)}pt;
     }}
     QPushButton#segBtn:hover {{ background: {p['SEG_HOVER']}; }}
     QPushButton#segBtn:checked {{
@@ -323,9 +350,9 @@ def qss() -> str:
     QFrame#select:hover {{ border-color: {p['PRIMARY_LINE']}; background: {p['SELECT_HOVER_BG']}; }}
     QFrame#select[open="true"] {{ border-color: {p['PRIMARY']}; }}
     QFrame#select[disabled="true"] {{ background: {p['SURFACE_SOFT']}; border-color: {p['BORDER']}; }}
-    QLabel#selectValue {{ color: {p['TEXT']}; font-size: 9.5pt; }}
+    QLabel#selectValue {{ color: {p['TEXT']}; font-size: {fs(9.5)}pt; }}
     QLabel#selectValue[disabled="true"] {{ color: {p['SELECT_DISABLED_TEXT']}; }}
-    QLabel#selectArrow {{ color: {p['MUTED']}; font-size: 9pt; }}
+    QLabel#selectArrow {{ color: {p['MUTED']}; font-size: {fs(9)}pt; }}
 
     QFrame#option {{ background: {p['SURFACE']}; border: 1px solid {p['BORDER']}; border-radius: 14px; }}
     QFrame#option[state="hover"] {{ border-color: {p['PRIMARY_LINE']}; background: {p['OPTION_HOVER_BG']}; }}
@@ -337,7 +364,7 @@ def qss() -> str:
 
     QLabel#badge {{
         border-radius: 13px; background: {p['BADGE_BG']}; color: {p['BADGE_TEXT']};
-        font-size: 10pt; font-weight: 700;
+        font-size: {fs(10)}pt; font-weight: 700;
     }}
     QLabel#badge[state="selected"] {{ background: {p['PRIMARY']}; color: #FFFFFF; }}
     QLabel#badge[state="correct"] {{ background: {p['SUCCESS']}; color: #FFFFFF; }}
@@ -345,7 +372,7 @@ def qss() -> str:
     QLabel#badge[state="missed"] {{ background: {p['SURFACE']}; color: {p['SUCCESS']}; border: 1px solid {p['SUCCESS']}; }}
     QLabel#badge[state="readonly"] {{ background: {p['BADGE_READONLY_BG']}; color: {p['BADGE_READONLY_TEXT']}; }}
 
-    QLabel#optionText {{ font-size: 10.5pt; color: {p['TEXT']}; }}
+    QLabel#optionText {{ font-size: {fs(10.5)}pt; color: {p['TEXT']}; }}
     QLabel#optionText[state="dim"] {{ color: {p['TEXT_DIM']}; }}
     QLabel#optionText[state="readonly"] {{ color: {p['TEXT_READONLY']}; }}
 
@@ -354,8 +381,8 @@ def qss() -> str:
         border: 1px dashed {p['PLACEHOLDER_BORDER']};
         border-radius: 14px;
     }}
-    QLabel#placeholderTitle {{ color: {p['PLACEHOLDER_TITLE']}; font-size: 10pt; }}
-    QLabel#placeholderText {{ color: {p['PLACEHOLDER_TEXT']}; font-size: 9pt; }}
+    QLabel#placeholderTitle {{ color: {p['PLACEHOLDER_TITLE']}; font-size: {fs(10)}pt; }}
+    QLabel#placeholderText {{ color: {p['PLACEHOLDER_TEXT']}; font-size: {fs(9)}pt; }}
     QFrame#feedback {{ border-radius: 14px; border: 1px solid {p['BORDER']}; background: {p['SURFACE_SOFT']}; }}
     QFrame#feedback[result="ok"] {{ background: {p['SUCCESS_SOFT']}; border-color: {p['SUCCESS_LINE']}; }}
     QFrame#feedback[result="bad"] {{ background: {p['DANGER_SOFT']}; border-color: {p['DANGER_LINE']}; }}
@@ -364,7 +391,7 @@ def qss() -> str:
         background: qlineargradient(x1:0, y1:0, x2:1, y2:1,
                     stop:0 {p['GRAD_A']}, stop:1 {p['GRAD_B']});
         color: #FFFFFF; border: none; border-radius: 12px;
-        padding: 10px 24px; font-size: 10.5pt; font-weight: 700;
+        padding: 10px 24px; font-size: {fs(10.5)}pt; font-weight: 700;
     }}
     QPushButton#primary:hover {{
         background: qlineargradient(x1:0, y1:0, x2:1, y2:1,
@@ -376,7 +403,7 @@ def qss() -> str:
     QPushButton#ghost {{
         background: {p['SURFACE']}; color: {p['TEXT_SECOND']};
         border: 1px solid {p['BORDER_STRONG']}; border-radius: 12px;
-        padding: 9px 18px; font-size: 10pt;
+        padding: 9px 18px; font-size: {fs(10)}pt;
     }}
     QPushButton#ghost:hover {{
         background: {p['GHOST_HOVER_BG']}; border-color: {p['PRIMARY_LINE']}; color: {p['PRIMARY_DARK']};
@@ -389,9 +416,18 @@ def qss() -> str:
         color: {p['GHOST_DISABLED_TEXT']}; border-color: {p['BORDER']}; background: {p['SURFACE_SOFT']};
     }}
 
+    QPushButton#chipBtn {{
+        background: {p['SURFACE']}; border: 1px solid {p['BORDER_STRONG']};
+        border-radius: 11px; color: {p['TEXT_SECOND']};
+        font-size: {{fs(10)}}pt; font-weight: 700;
+    }}
+    QPushButton#chipBtn:hover {{
+        background: {p['PRIMARY_SOFT']}; border-color: {p['PRIMARY_LINE']}; color: {p['PRIMARY_DARK']};
+    }}
+
     QPushButton#link {{
         background: transparent; border: none; color: {p['MUTED']};
-        padding: 4px 2px; font-size: 9pt;
+        padding: 4px 2px; font-size: {fs(9)}pt;
     }}
     QPushButton#link:hover {{ color: {p['PRIMARY']}; }}
 
@@ -411,7 +447,7 @@ def qss() -> str:
     }}
     QMenu::item {{
         padding: 8px 30px 8px 12px; border-radius: 8px;
-        color: {p['TEXT_SECOND']}; font-size: 9.5pt;
+        color: {p['TEXT_SECOND']}; font-size: {fs(9.5)}pt;
     }}
     QMenu::item:selected {{ background: {p['PRIMARY_SOFT']}; color: {p['PRIMARY_DARK']}; }}
     QMenu::separator {{ height: 1px; background: {p['BORDER']}; margin: 5px 8px; }}
@@ -421,12 +457,12 @@ def qss() -> str:
     }}
     QLineEdit#popupSearch {{
         background: {p['SEARCH_BG']}; border: 1px solid {p['BORDER']}; border-radius: 9px;
-        padding: 6px 10px; color: {p['TEXT']}; font-size: 9.5pt;
+        padding: 6px 10px; color: {p['TEXT']}; font-size: {fs(9.5)}pt;
         selection-background-color: {p['PRIMARY_SOFT']}; selection-color: {p['PRIMARY_DARK']};
     }}
     QLineEdit#popupSearch:focus {{ border-color: {p['PRIMARY_LINE']}; background: {p['SURFACE']}; }}
     QListWidget#popupList {{
-        border: none; background: transparent; outline: none; font-size: 9.5pt;
+        border: none; background: transparent; outline: none; font-size: {fs(9.5)}pt;
     }}
     QListWidget#popupList::item {{
         padding: 6px 9px; border-radius: 8px; color: {p['TEXT_SECOND']};
@@ -438,11 +474,11 @@ def qss() -> str:
 
     QToolTip {{
         background: {p['TOOLTIP_BG']}; color: {p['TOOLTIP_TEXT']}; border: none;
-        padding: 6px 9px; border-radius: 6px; font-size: 9pt;
+        padding: 6px 9px; border-radius: 6px; font-size: {fs(9)}pt;
     }}
 
     QFrame#wrongItem {{ background: transparent; border: none; border-radius: 10px; margin: 0; }}
     QFrame#wrongItem:hover {{ background: {p['PRIMARY_SOFT']}; }}
-    QLabel#wrongStem {{ color: {p['TEXT_SECOND']}; font-size: 9pt; }}
-    QLabel#wrongMeta {{ color: {p['MUTED']}; font-size: 8.5pt; }}
+    QLabel#wrongStem {{ color: {p['TEXT_SECOND']}; font-size: {fs(9)}pt; }}
+    QLabel#wrongMeta {{ color: {p['MUTED']}; font-size: {fs(8.5)}pt; }}
     """

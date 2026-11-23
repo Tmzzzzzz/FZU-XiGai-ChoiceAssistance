@@ -170,7 +170,60 @@ def main():
     w._toggle_theme()
     app.processEvents()
 
-    print("[12] 重置")
+    print("[12] 名词解释命中")
+    from app.glossary import match_terms
+    hit = [t for t, _ in match_terms(bank.by_id["09S02"], bank.glossary)]
+    assert "十一个坚持" in hit, hit
+    assert len(bank.glossary) >= 30
+    ok(f"术语表 {len(bank.glossary)} 条，命中：{hit}")
+
+    print("[13] 随机模式的题型范围")
+    w._switch_mode("random")
+    w.sidebar.type_select.set_value("single")
+    w._on_filters()
+    app.processEvents()
+    assert w.session.total == 176, w.session.total
+    assert all(bank.by_id[i].type == "single" for i in w.session.queue)
+    w.sidebar.type_select.set_value("multiple")
+    w._on_filters()
+    assert w.session.total == 95, w.session.total
+    ok("随机模式可限定单选（176）/ 多选（95）")
+    w.sidebar.type_select.set_value(None)
+    w._on_filters()
+
+    print("[14] 复习调度")
+    from datetime import datetime, timedelta
+    probe = bank.questions[0]
+    w.store.record(probe.id, sorted(probe.answer), False)
+    rec = w.store.get(probe.id)
+    assert rec["streak"] == 0 and rec["wrong"] == 1
+    hours = (datetime.fromisoformat(rec["due"]) - datetime.now()).total_seconds() / 3600
+    assert 5.5 < hours < 6.5, hours
+    w.store.record(probe.id, sorted(probe.answer), True)
+    days1 = (datetime.fromisoformat(w.store.get(probe.id)["due"]) - datetime.now()).total_seconds() / 86400
+    w.store.record(probe.id, sorted(probe.answer), True)
+    days2 = (datetime.fromisoformat(w.store.get(probe.id)["due"]) - datetime.now()).total_seconds() / 86400
+    assert 0.9 < days1 < 1.1 and 2.9 < days2 < 3.1, (days1, days2)
+    ok("答错 6 小时后重练；连续答对间隔 1 天 → 3 天")
+
+    w.store.records[probe.id]["due"] = (datetime.now() - timedelta(days=1)).isoformat(timespec="seconds")
+    assert w.session.due_count() >= 1
+    w.session.rebuild(keep_current=False)
+    assert w.session.queue[0] == probe.id
+    ok("到期错题排在随机队列最前")
+
+    print("[15] 字号三档")
+    w._set_font_level("large")
+    app.processEvents()
+    assert theme.font_level() == "large" and "15.1pt" in app.styleSheet()
+    w._flush()
+    assert ProgressStore(p).get_pref("font_scale") == "large"
+    w._set_font_level("small")
+    assert "11.4pt" in app.styleSheet()
+    w._set_font_level("medium")
+    ok("大 / 中 / 小切换生效并写入偏好")
+
+    print("[16] 重置")
     w.store.reset()
     w.session.rebuild(keep_current=False)
     w._refresh_all()

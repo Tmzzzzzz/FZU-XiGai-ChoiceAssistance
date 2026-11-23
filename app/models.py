@@ -59,6 +59,7 @@ class Bank:
     chapters: tuple[Chapter, ...]
     questions: tuple[Question, ...]
     by_id: dict[str, Question]
+    glossary: dict[str, str]
 
     def chapter(self, chapter_id: str) -> Chapter:
         for c in self.chapters:
@@ -121,10 +122,13 @@ def load_bank(path: str | Path) -> Bank:
     _require(len(by_id) == len(questions), "题目 id 重复")
 
     meta = raw.get("meta", {})
+    glossary = meta.get("glossary") or {}
+    _require(isinstance(glossary, dict), "glossary 必须是对象")
     return Bank(
         title=meta.get("title", "选择题题库"),
         version=meta.get("version", "1.0.0"),
         chapters=chapters,
         questions=tuple(questions),
         by_id=by_id,
+        glossary={str(k): str(v) for k, v in glossary.items() if str(k).strip()},
     )

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import random
 from dataclasses import dataclass
+from datetime import datetime
 
 from .models import Bank, Question
 from .store import ProgressStore
@@ -44,35 +45,70 @@ class QuizSession:
         qs = list(self.bank.questions)
         if self.mode == "wrong":
             wrong = set(self.wrong_ids())
-            qs = [q for q in qs if q.id in wrong]
-        elif self.mode == "filter":
+            return [q for q in qs if q.id in wrong]
+
+        # 题型范围在随机、筛选两种模式下都生效；章节/知识点只在筛选模式生效
+        tp = self.filters.get("type")
+        if tp:
+            qs = [q for q in qs if q.type == tp]
+
+        if self.mode == "filter":
             ch = self.filters.get("chapter")
             kp = self.filters.get("knowledge")
-            tp = self.filters.get("type")
             if ch:
                 qs = [q for q in qs if q.chapter_id == ch]
             if kp:
                 qs = [q for q in qs if q.knowledge == kp]
-            if tp:
-                qs = [q for q in qs if q.type == tp]
             qs.sort(key=lambda q: q.order)
-            return qs
         return qs
 
     def rebuild(self, keep_current: bool = True) -> None:
         current = self.current.id if self.queue else None
         qs = self.candidates()
         if self.mode == "random":
-            fresh = [q for q in qs if q.id not in self.store.records]
-            done = [q for q in qs if q.id in self.store.records]
-            self.rng.shuffle(fresh)
-            self.rng.shuffle(done)
-            qs = fresh + done
+            qs = self._memory_order(qs)
         self.queue = [q.id for q in qs]
         if keep_current and current in self.queue:
             self.index = self.queue.index(current)
         else:
             self.index = 0
+
+    # ---------------------------------------------------------------- 复习调度
+    @staticmethod
+    def _is_due(rec: dict | None, now: datetime) -> bool:
+        if not rec:
+            return False
+        try:
+            return datetime.fromisoformat(str(rec.get("due"))) <= now
+        except (TypeError, ValueError):
+            return True
+
+    def _memory_order(self, qs: list[Question]) -> list[Question]:
+        """按记忆优先级分桶：到期错题 → 新题 → 到期旧题 → 未到期。
+
+        每桶内部打乱，保证同一个会话里不会出现固定顺序，但先做最该复习的。
+        """
+        now = datetime.now()
+        buckets: dict[int, list[Question]] = {0: [], 1: [], 2: [], 3: []}
+        for q in qs:
+            rec = self.store.records.get(q.id)
+            if rec is None:
+                buckets[1].append(q)
+            elif int(rec.get("wrong", 0)) > 0 and self._is_due(rec, now):
+                buckets[0].append(q)
+            elif self._is_due(rec, now):
+                buckets[2].append(q)
+            else:
+                buckets[3].append(q)
+        for group in buckets.values():
+            self.rng.shuffle(group)
+        return buckets[0] + buckets[1] + buckets[2] + buckets[3]
+
+    def due_count(self) -> int:
+        """已到复习时间、且此前作答过的题数。"""
+        now = datetime.now()
+        return sum(1 for qid, rec in self.store.records.items()
+                   if qid in self.bank.by_id and self._is_due(rec, now))
 
     def reshuffle(self) -> None:
         self.rng.shuffle(self.queue)
@@ -131,9 +167,15 @@ class QuizSession:
                      wrong=attempted - correct, total=len(self.bank.questions))
 
     def wrong_ids(self) -> list[str]:
+        """错题按「错得最多 → 最快到期 → 最早作答」排序，优先攻克顽固题。"""
         ids = [qid for qid, r in self.store.records.items() if not r.get("correct")]
         order = {q.id: q.order for q in self.bank.questions}
-        return sorted((i for i in ids if i in order), key=lambda i: order[i])
+
+        def key(qid: str):
+            rec = self.store.records.get(qid, {})
+            return (-int(rec.get("wrong", 0)), str(rec.get("due", "")), order[qid])
+
+        return sorted((i for i in ids if i in order), key=key)
 
     # ---------------------------------------------------------------- 筛选
     def set_mode(self, mode: str) -> None:

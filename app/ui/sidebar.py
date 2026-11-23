@@ -73,7 +73,7 @@ class Sidebar(QWidget):
         filter_label.setObjectName("sectionLabel")
         lay.addWidget(filter_label)
 
-        self.filter_note = QLabel("切换到「筛选」后可设置")
+        self.filter_note = QLabel("章节 / 知识点需切到「筛选」模式")
         self.filter_note.setObjectName("hint")
         self.filter_note.setWordWrap(True)
         lay.addWidget(self.filter_note)
@@ -164,13 +164,18 @@ class Sidebar(QWidget):
     def refresh(self) -> None:
         mode = self.session.mode
         self.segmented.set_index(MODES.index(mode))
-        editable = mode == "filter"
-        for sel in (self.chapter_select, self.kp_select, self.type_select):
-            sel.set_disabled(not editable)
-        self.filter_note.setVisible(not editable)
+        for sel in (self.chapter_select, self.kp_select):
+            sel.set_disabled(mode != "filter")
+        self.type_select.set_disabled(mode == "wrong")
+        self.filter_note.setVisible(mode != "filter")
 
         if mode == "random":
-            self.mode_hint.setText("从全部题目中随机抽题，优先未做过的题。")
+            tp = self.session.filters.get("type")
+            scope = {"single": "仅单选", "multiple": "仅多选"}.get(tp or "", "")
+            if scope:
+                self.mode_hint.setText(f"随机抽题，范围：{scope}，优先未做过的题。")
+            else:
+                self.mode_hint.setText("从全部题目中随机抽题，优先未做过的题。")
         elif mode == "filter":
             self.mode_hint.setText("按章节 / 知识点 / 题型组合筛选，顺序练习。")
         else:

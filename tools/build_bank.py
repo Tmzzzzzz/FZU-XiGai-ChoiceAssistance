@@ -20,7 +20,8 @@ import docx
 import pymupdf
 
 sys.path.insert(0, str(Path(__file__).parent))
-from annotations import CHAPTER_KP, EXPLANATIONS, FIXES, NOTES  # noqa: E402
+from annotations import CHAPTER_KP, EXPLANATIONS, EXTRA, FIXES, NOTES  # noqa: E402
+from glossary import GLOSSARY  # noqa: E402
 
 ROOT = Path(__file__).resolve().parent.parent
 # 源文件目录：可通过环境变量 XIGAI_SRC 覆盖
@@ -322,7 +323,7 @@ def build() -> dict:
             "stem": q["stem"],
             "options": [{"key": letter, "text": text} for letter, text in q["options"].items()],
             "answer": list(q["answer"]),
-            "explanation": EXPLANATIONS[k],
+            "explanation": EXPLANATIONS[k] + EXTRA.get(k, ""),
         }
         if k in NOTES:
             item["note"] = NOTES[k]
@@ -346,12 +347,13 @@ def build() -> dict:
         "meta": {
             "title": "《习近平新时代中国特色社会主义思想概论》选择题题库",
             "subject": "习近平新时代中国特色社会主义思想概论",
-            "version": "1.0.0",
+            "version": "1.1.0",
             "source": {
                 "pdf": PDF_NAME,
                 "docx": DOCX_NAME,
                 "note": "PDF 与 DOCX 逐题比对，题量、题干、选项、答案一致；PDF 完整度更高，作为主数据源。",
             },
+            "glossary": dict(GLOSSARY),
             "total": len(final),
             "single": sum(1 for q in final if q["type"] == "single"),
             "multiple": sum(1 for q in final if q["type"] == "multiple"),

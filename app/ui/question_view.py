@@ -2,11 +2,14 @@
 """题目主视图：题干、选项、作答反馈。"""
 from __future__ import annotations
 
+from datetime import datetime
+
 from PySide6.QtCore import QRectF, Qt, QTimer, Signal
 from PySide6.QtGui import QColor, QLinearGradient, QPainter
 from PySide6.QtWidgets import (QFrame, QHBoxLayout, QLabel, QPushButton,
                                QScrollArea, QSizePolicy, QVBoxLayout, QWidget)
 
+from ..glossary import match_terms
 from ..models import Question
 from . import theme
 from .widgets import Chip, HLine, OptionRow, ResultIcon, WrapLabel
@@ -48,6 +51,7 @@ class QuestionView(QWidget):
     def __init__(self, parent=None):
         super().__init__(parent)
         self.question: Question | None = None
+        self._glossary: dict[str, str] = {}
         self._rows: dict[str, OptionRow] = {}
         self._chosen: set[str] = set()
         self._locked = False
@@ -129,6 +133,11 @@ class QuestionView(QWidget):
         self.fb_line.setTextFormat(Qt.PlainText)
         fb.addWidget(self.fb_line)
 
+        self.fb_schedule = QLabel("")
+        self.fb_schedule.setObjectName("scheduleText")
+        self.fb_schedule.setVisible(False)
+        fb.addWidget(self.fb_schedule)
+
         self.explain_box = QVBoxLayout()
         self.explain_box.setSpacing(4)
         tag = QLabel("解析")
@@ -139,6 +148,20 @@ class QuestionView(QWidget):
         self.explain_box.addWidget(tag)
         self.explain_box.addWidget(self.fb_explain)
         fb.addLayout(self.explain_box)
+
+        # ---- 名词解释（命中术语时才显示）
+        self.glossary_box = QWidget()
+        gb = QVBoxLayout(self.glossary_box)
+        gb.setContentsMargins(0, 2, 0, 0)
+        gb.setSpacing(8)
+        self.glossary_tag = QLabel("名词解释")
+        self.glossary_tag.setObjectName("explainTitle")
+        self.glossary_body = QVBoxLayout()
+        self.glossary_body.setSpacing(8)
+        gb.addWidget(self.glossary_tag)
+        gb.addLayout(self.glossary_body)
+        self.glossary_box.setVisible(False)
+        fb.addWidget(self.glossary_box)
 
         self.fb_note = WrapLabel("")
         self.fb_note.setObjectName("explainText")
@@ -203,6 +226,55 @@ class QuestionView(QWidget):
         foot.addWidget(self.next_btn, 0)
         card.addLayout(foot)
 
+    def set_schedule(self, record: dict | None) -> None:
+        if not record or not record.get("due"):
+            self.fb_schedule.setVisible(False)
+            return
+        try:
+            delta = datetime.fromisoformat(str(record["due"])) - datetime.now()
+        except (TypeError, ValueError):
+            self.fb_schedule.setVisible(False)
+            return
+        seconds = delta.total_seconds()
+        if seconds <= 0:
+            when = "现在"
+        elif seconds >= 82800:          # 接近或超过一天，按天显示
+            when = f"{max(1, round(seconds / 86400))} 天后"
+        elif seconds >= 3600:
+            when = f"{round(seconds / 3600)} 小时后"
+        else:
+            when = f"{max(1, round(seconds / 60))} 分钟后"
+        streak = int(record.get("streak", 0))
+        tail = f"｜连续答对 {streak} 次" if streak > 1 else ""
+        self.fb_schedule.setText(f"记忆安排：{when}复习{tail}")
+        self.fb_schedule.setVisible(True)
+
+    def set_glossary(self, glossary: dict[str, str]) -> None:
+        self._glossary = dict(glossary or {})
+
+    def _render_glossary(self, question: Question) -> None:
+        while self.glossary_body.count():
+            item = self.glossary_body.takeAt(0)
+            widget = item.widget()
+            if widget is not None:
+                widget.setParent(None)
+                widget.deleteLater()
+        terms = match_terms(question, self._glossary)
+        for term, explain in terms:
+            holder = QWidget()
+            box = QVBoxLayout(holder)
+            box.setContentsMargins(0, 0, 0, 0)
+            box.setSpacing(2)
+            name = QLabel(f"「{term}」")
+            name.setObjectName("glossaryTerm")
+            desc = WrapLabel(explain)
+            desc.setObjectName("glossaryText")
+            desc.setTextFormat(Qt.PlainText)
+            box.addWidget(name)
+            box.addWidget(desc)
+            self.glossary_body.addWidget(holder)
+        self.glossary_box.setVisible(bool(terms))
+
     # ---------------------------------------------------------------- 渲染
     def _clear_options(self) -> None:
         while self.options_box.count():
@@ -238,6 +310,8 @@ class QuestionView(QWidget):
             self._rows[opt.key] = row
 
         self.feedback.setVisible(False)
+        self.glossary_box.setVisible(False)
+        self.fb_schedule.setVisible(False)
         self.placeholder.setVisible(True)
         self.submit_btn.setVisible(True)
         self.next_btn.setVisible(False)
@@ -252,6 +326,7 @@ class QuestionView(QWidget):
             self._locked = True
             self._chosen = set(chosen)
             self._paint_result(bool(record.get("correct")), chosen, record.get("attempts", 1))
+            self.set_schedule(record)
 
     def _update_submit_state(self) -> None:
         self.submit_btn.setEnabled(bool(self._chosen) and not self._locked)
@@ -332,6 +407,7 @@ class QuestionView(QWidget):
         self.fb_note.setVisible(bool(q.note))
         if q.note:
             self.fb_note.setText(f"提示：{q.note}")
+        self._render_glossary(q)
         self.feedback.setVisible(True)
         self.placeholder.setVisible(False)
 
@@ -350,6 +426,8 @@ class QuestionView(QWidget):
             row.set_state("idle")
             row.set_interactive(True)
         self.feedback.setVisible(False)
+        self.glossary_box.setVisible(False)
+        self.fb_schedule.setVisible(False)
         self.placeholder.setVisible(True)
         self.submit_btn.setVisible(True)
         self.next_btn.setVisible(False)

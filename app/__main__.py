@@ -111,12 +111,13 @@ def _run() -> int:
     app.setApplicationDisplayName("习概选择题")
     app.setOrganizationName("Xigai")
     app.setStyle("Fusion")
-    app.setFont(theme.base_font(10))
 
     state_path = _state_path()
     _migrate_legacy(state_path)
     store = ProgressStore(state_path)
     theme.set_mode(_resolve_theme(store))
+    theme.set_font_scale(store.get_pref("font_scale", "medium"))
+    app.setFont(theme.base_font(10))
     app.setPalette(theme.app_palette())
     app.setStyleSheet(theme.qss())
 

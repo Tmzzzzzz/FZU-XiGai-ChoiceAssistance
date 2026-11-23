@@ -4,11 +4,12 @@ from __future__ import annotations
 
 import random
 
-from PySide6.QtCore import Qt, QTimer
-from PySide6.QtGui import QColor, QIcon, QKeySequence, QLinearGradient, QPainter, QPainterPath, QPixmap, QShortcut
+from PySide6.QtCore import QPoint, Qt, QTimer
+from PySide6.QtGui import (QActionGroup, QColor, QIcon, QKeySequence, QLinearGradient,
+                           QPainter, QPainterPath, QPixmap, QShortcut)
 from PySide6.QtWidgets import (QApplication, QFrame, QHBoxLayout, QLabel, QMainWindow,
-                               QMessageBox, QPushButton, QStackedWidget, QVBoxLayout,
-                               QWidget)
+                               QMenu, QMessageBox, QPushButton, QStackedWidget,
+                               QVBoxLayout, QWidget)
 
 from .models import Bank
 from .session import MODE_LABELS, QuizSession
@@ -126,6 +127,14 @@ class MainWindow(QMainWindow):
         self.theme_btn = ThemeToggle(theme.is_dark())
         self.theme_btn.clicked.connect(self._toggle_theme)
         top.addWidget(self.theme_btn, 0)
+
+        self.font_btn = QPushButton("Aa")
+        self.font_btn.setObjectName("chipBtn")
+        self.font_btn.setFixedSize(38, 38)
+        self.font_btn.setCursor(Qt.PointingHandCursor)
+        self.font_btn.setToolTip("字体大小")
+        self.font_btn.clicked.connect(self._show_font_menu)
+        top.addWidget(self.font_btn, 0)
         col.addLayout(top)
 
         # ---- 主体
@@ -137,6 +146,7 @@ class MainWindow(QMainWindow):
         body.addWidget(self.stack, 1)
 
         self.view = QuestionView()
+        self.view.set_glossary(self.bank.glossary)
         self.stack.addWidget(self.view)
 
         # 空状态页
@@ -239,6 +249,7 @@ class MainWindow(QMainWindow):
         correct = self.session.submit(chosen)
         record = self.session.state_of(q.id) or {}
         self.view.mark_submitted(chosen, correct, record.get("attempts", 1))
+        self.view.set_schedule(record)
         self.view.set_nav(self.session.index > 0, self.session.index + 1 < self.session.total)
         self.insights.refresh()
         self.sidebar.refresh()
@@ -372,7 +383,10 @@ class MainWindow(QMainWindow):
         elif mode == "wrong":
             parts.append(f"错题本 {len(self.session.wrong_ids())} 题")
         else:
-            parts.append("优先未做过的题")
+            tp = self.session.filters.get("type")
+            if tp:
+                parts.append("范围：" + ("单选题" if tp == "single" else "多选题"))
+            parts.append("优先到期复习与未做过的题")
         st = self.session.stats()
         parts.append(f"已做 {st.attempted}/{st.total}")
         self.page_sub.setText("　·　".join(parts))
@@ -414,10 +428,30 @@ class MainWindow(QMainWindow):
         self.store.set_pref("theme", target)
         self._save()
 
+    def _show_font_menu(self) -> None:
+        menu = QMenu(self)
+        group = QActionGroup(menu)
+        group.setExclusive(True)
+        for level in ("small", "medium", "large"):
+            act = menu.addAction(f"{theme.FONT_LABELS[level]}号字")
+            act.setCheckable(True)
+            act.setChecked(theme.font_level() == level)
+            act.triggered.connect(lambda _=False, lv=level: self._set_font_level(lv))
+            group.addAction(act)
+        menu.setMinimumWidth(self.font_btn.width() + 60)
+        menu.exec(self.font_btn.mapToGlobal(QPoint(0, self.font_btn.height() + 6)))
+
+    def _set_font_level(self, level: str) -> None:
+        theme.set_font_scale(level)
+        self._apply_theme()
+        self.store.set_pref("font_scale", level)
+        self._save()
+
     def _apply_theme(self) -> None:
         app = QApplication.instance()
         if app is None:
             return
+        app.setFont(theme.base_font(10))
         app.setPalette(theme.app_palette())
         app.setStyleSheet(theme.qss())
         for widget in app.allWidgets():
