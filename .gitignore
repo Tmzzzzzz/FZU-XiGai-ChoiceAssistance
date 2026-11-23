@@ -11,3 +11,6 @@ logs/
 build/
 dist/
 assets/_tmp_*.png
+
+# 打包时暂存用户记录
+_keep_userdata/
