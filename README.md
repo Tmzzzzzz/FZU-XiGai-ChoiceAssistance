@@ -58,7 +58,7 @@ docs/     数据报告、排序算法说明、截图、便携版说明
 
 ## 打包与迁移
 
-`.venv\Scripts\python tools\build_exe.py` 生成 `dist/习概选择题/`（约 98 MB，自包含 Qt 运行时）。
+`.venv\Scripts\python tools\build_exe.py` 生成 `dist/FZU-XiGai-ChoiceAssistance/`（约 97 MB，自包含 Qt 运行时）。
 使用说明、换机与备份方式见 [docs/portable-guide.txt](docs/portable-guide.txt)。
 
 ## 说明

@@ -4,8 +4,8 @@
 用法：
     .venv/Scripts/python.exe tools/build_exe.py
 
-产物：dist/习概选择题/  —— 整个文件夹拷到任意位置或另一台电脑即可运行，
-不依赖本机的 Python 环境。题库 data/ 与记录 userdata/ 都在 exe 同级目录。
+产物：dist/FZU-XiGai-ChoiceAssistance/  —— 整个文件夹拷到任意位置或另一台电脑
+即可运行，不依赖本机的 Python 环境。题库 data/ 与记录 userdata/ 都在 exe 同级目录。
 """
 from __future__ import annotations
 
@@ -15,9 +15,11 @@ import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
-APP_NAME = "习概选择题"
+APP_NAME = "习概选择题"                 # exe 名（中文，方便双击）
+BUNDLE_NAME = "FZU-XiGai-ChoiceAssistance"  # 发布文件夹名（与仓库同名）
 DIST = ROOT / "dist"
 TARGET = DIST / APP_NAME
+FINAL = DIST / BUNDLE_NAME
 
 
 def main() -> int:
@@ -41,6 +43,10 @@ def main() -> int:
         cmd += ["--icon", str(icon)]
     cmd.append(str(ROOT / "launch.py"))
 
+    # 先自己删干净：PyInstaller 的批量删除会触发沙箱的安全限制
+    if TARGET.exists():
+        shutil.rmtree(TARGET)
+
     print("building...")
     subprocess.run(cmd, check=True, cwd=ROOT)
 
@@ -53,8 +59,13 @@ def main() -> int:
     if guide.exists():
         shutil.copy2(guide, TARGET / "使用说明.txt")
 
-    exe = TARGET / f"{APP_NAME}.exe"
-    size = sum(f.stat().st_size for f in TARGET.rglob("*") if f.is_file()) / 1024 / 1024
+    # 输出目录改成与仓库同名的发布目录
+    if FINAL.exists():
+        shutil.rmtree(FINAL)
+    TARGET.rename(FINAL)
+
+    exe = FINAL / f"{APP_NAME}.exe"
+    size = sum(f.stat().st_size for f in FINAL.rglob("*") if f.is_file()) / 1024 / 1024
     print(f"\n完成：{exe}")
     print(f"目录大小：{size:.1f} MB")
     return 0
