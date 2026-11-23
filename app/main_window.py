@@ -112,7 +112,7 @@ class MainWindow(QMainWindow):
         self.restart_btn = QPushButton("重新开始")
         self.restart_btn.setObjectName("ghost")
         self.restart_btn.setCursor(Qt.PointingHandCursor)
-        self.restart_btn.setToolTip("打乱并重新开始本轮练习，统计不会清零")
+        self.restart_btn.setToolTip("按最新掌握度重排，并从第一题重新开始；统计保留")
         self.restart_btn.clicked.connect(self._restart_round)
         top.addWidget(self.restart_btn, 0)
 
@@ -297,9 +297,8 @@ class MainWindow(QMainWindow):
         self._save()
 
     def _restart_round(self) -> None:
-        self.session.rebuild(keep_current=False)
-        if self.session.mode == "random":
-            self.session.reshuffle()
+        # 重新排序：掌握度、错题次数都按最新记录重算；本轮已答状态清空
+        self.session.rebuild(keep_current=False, new_round=True)
         self._render()
         self.insights.refresh()
         self.sidebar.refresh()
@@ -363,7 +362,8 @@ class MainWindow(QMainWindow):
             return
         self.stack.setCurrentIndex(0)
         record = self.session.state_of(q.id)
-        review = self.session.mode != "wrong"   # 错题模式默认重新作答
+        # 只有本轮回显；错题模式始终从头重做，避免直接看到上次答案
+        review = self.session.mode != "wrong" and q.id in self.session.round_done
         self.view.load(q, self.session.index, self.session.total, record, review=review)
         self.view.set_nav(self.session.index > 0,
                           self.session.index + 1 < self.session.total)

@@ -38,6 +38,7 @@ class QuizSession:
         self.filters: dict[str, str | None] = {"chapter": None, "knowledge": None, "type": None}
         self.queue: list[str] = []
         self.index = 0
+        self.round_done: set[str] = set()   # 本轮已作答的题（切换轮次时清空）
         self.rebuild()
 
     # ---------------------------------------------------------------- 队列
@@ -62,11 +63,13 @@ class QuizSession:
             qs.sort(key=lambda q: q.order)
         return qs
 
-    def rebuild(self, keep_current: bool = True) -> None:
+    def rebuild(self, keep_current: bool = True, new_round: bool = False) -> None:
         current = self.current.id if self.queue else None
         qs = self.candidates()
         if self.mode in ("random", "wrong"):
             qs = priority.order(qs, self.store.records, self.bank, self.rng)
+        if new_round:
+            self.round_done.clear()
         self.queue = [q.id for q in qs]
         if keep_current and current in self.queue:
             self.index = self.queue.index(current)
@@ -79,8 +82,9 @@ class QuizSession:
         return priority.weak_count(list(self.bank.questions), self.store.records)
 
     def reshuffle(self) -> None:
-        """重新计算一次顺序（同分抖动不同，得到新的排法）。"""
-        self.rebuild(keep_current=True)
+        """打乱本轮顺序（R 键）：保留本轮已答状态，只改先后。"""
+        self.rng.shuffle(self.queue)
+        self.index = 0
 
     # ---------------------------------------------------------------- 导航
     @property
@@ -122,6 +126,7 @@ class QuizSession:
             return False
         ok = q.is_correct(chosen)
         self.store.record(q.id, sorted(chosen), ok)
+        self.round_done.add(q.id)
         return ok
 
     def state_of(self, question_id: str) -> dict | None:

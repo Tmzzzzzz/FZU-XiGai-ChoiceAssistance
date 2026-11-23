@@ -252,7 +252,29 @@ def main():
     w._set_font_level("medium")
     ok("大 / 中 / 小切换生效并写入偏好")
 
-    print("[16] 重置")
+    print("[16] 打乱与重新开始")
+    cur = w.session.current
+    if cur.id not in w.session.round_done:
+        for k in sorted(cur.answer):
+            w.view.toggle_key(k)
+        w.view.submit()
+    app.processEvents()
+    assert cur.id in w.session.round_done and w.view.feedback.isVisible()
+    before = list(w.session.queue[:8])
+    w._shuffle()
+    app.processEvents()
+    assert w.session.index == 0 and w.session.queue[:8] != before
+    assert w.view.feedback.isVisible() is False or w.session.queue[0] == cur.id
+    ok("R 键真正打乱队列并回到第一题")
+
+    w._restart_round()
+    app.processEvents()
+    assert not w.session.round_done
+    assert not w.view.feedback.isVisible() and w.view.placeholder.isVisible()
+    assert w.session.stats().attempted >= 1
+    ok("重新开始本轮清空作答状态，统计保留")
+
+    print("[17] 重置")
     w.store.reset()
     w.session.rebuild(keep_current=False)
     w._refresh_all()
