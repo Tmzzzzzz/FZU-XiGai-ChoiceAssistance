@@ -299,7 +299,29 @@ def main():
     assert w.session.queue[:6] != before
     ok("侧栏「打乱并重新开始」清空本轮并重排")
 
-    print("[18] 重置")
+    print("[18] 回车提交不跳题")
+    w._restart_round()
+    app.processEvents()
+    cur = w.session.current
+    for k in sorted(cur.answer):
+        w.view.toggle_key(k)
+    idx = w.session.index
+    QTest.keyClick(w, _Qt.Key_Return)
+    app.processEvents()
+    assert w.session.index == idx, (w.session.index, idx)
+    assert w.view.feedback.isVisible() and w.view.is_locked
+    ok("回车提交后停留在本题并显示解析")
+
+    QTest.keyClick(w, _Qt.Key_Return)
+    app.processEvents()
+    assert w.session.index == idx + 1
+    ok("解析出来后再次回车才进入下一题")
+
+    from PySide6.QtWidgets import QPushButton
+    assert all(b.focusPolicy() == _Qt.NoFocus for b in w.findChildren(QPushButton))
+    ok("按钮不抢焦点，避免回车双触发")
+
+    print("[19] 重置")
     w.store.reset()
     w.session.rebuild(keep_current=False)
     w._refresh_all()

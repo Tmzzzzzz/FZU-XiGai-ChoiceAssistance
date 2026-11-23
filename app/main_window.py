@@ -55,6 +55,11 @@ class MainWindow(QMainWindow):
 
         self._restore_prefs()
         self._build_ui()
+        # 按钮不接收焦点：否则点过「提交答案」后按 Enter，会同时触发
+        # 快捷键与按钮的默认点击，导致刚提交就跳到下一题
+        for button in self.findChildren(QPushButton):
+            button.setFocusPolicy(Qt.NoFocus)
+
         self._bind_shortcuts()
         self._refresh_all()
         self._initial_size()
@@ -247,11 +252,14 @@ class MainWindow(QMainWindow):
 
     # ---------------------------------------------------------------- 流程
     def _enter(self) -> None:
-        q = self.session.current
-        if q is None:
+        """Enter：未提交则提交，已出反馈则下一题。
+
+        以「当前视图是否已锁定」为准，而不是历史记录——
+        否则重做旧题时按 Enter 会直接跳到下一题。
+        """
+        if self.session.current is None:
             return
-        record = self.session.state_of(q.id)
-        if record is not None:
+        if self.view.is_locked:
             self._on_next()
         elif self.view.has_selection:
             self.view.submit()

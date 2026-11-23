@@ -342,6 +342,11 @@ class QuestionView(QWidget):
             self._toggle(key)
 
     @property
+    def is_locked(self) -> bool:
+        """当前题是否已经提交并展示反馈。"""
+        return self._locked
+
+    @property
     def has_selection(self) -> bool:
         return bool(self._chosen)
 
