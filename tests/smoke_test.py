@@ -191,26 +191,53 @@ def main():
     w.sidebar.type_select.set_value(None)
     w._on_filters()
 
-    print("[14] 复习调度")
-    from datetime import datetime, timedelta
-    probe = bank.questions[0]
-    w.store.record(probe.id, sorted(probe.answer), False)
-    rec = w.store.get(probe.id)
-    assert rec["streak"] == 0 and rec["wrong"] == 1
-    hours = (datetime.fromisoformat(rec["due"]) - datetime.now()).total_seconds() / 3600
-    assert 5.5 < hours < 6.5, hours
-    w.store.record(probe.id, sorted(probe.answer), True)
-    days1 = (datetime.fromisoformat(w.store.get(probe.id)["due"]) - datetime.now()).total_seconds() / 86400
-    w.store.record(probe.id, sorted(probe.answer), True)
-    days2 = (datetime.fromisoformat(w.store.get(probe.id)["due"]) - datetime.now()).total_seconds() / 86400
-    assert 0.9 < days1 < 1.1 and 2.9 < days2 < 3.1, (days1, days2)
-    ok("答错 6 小时后重练；连续答对间隔 1 天 → 3 天")
+    print("[14] 出题优先级")
+    import random as _random
+    from app import priority
 
-    w.store.records[probe.id]["due"] = (datetime.now() - timedelta(days=1)).isoformat(timespec="seconds")
-    assert w.session.due_count() >= 1
-    w.session.rebuild(keep_current=False)
-    assert w.session.queue[0] == probe.id
-    ok("到期错题排在随机队列最前")
+    w.store.reset()
+    # 覆盖不同知识点各取一题
+    seen_kp, sample = set(), []
+    for q in bank.questions:
+        if q.knowledge not in seen_kp:
+            seen_kp.add(q.knowledge)
+            sample.append(q)
+        if len(sample) >= 5:
+            break
+    weak, solid, untouched = sample[0], sample[1], sample[2]
+    for _ in range(2):
+        w.store.record(weak.id, sorted(weak.answer), False)
+    for _ in range(3):
+        w.store.record(solid.id, sorted(solid.answer), True)
+
+    m_weak = priority.mastery(w.store.get(weak.id))
+    m_solid = priority.mastery(w.store.get(solid.id))
+    assert m_weak < 0.4 and m_solid > 0.75, (m_weak, m_solid)
+    assert priority.mastery(None) is None
+    ok(f"掌握度：错两次 {m_weak:.0%} / 连对三次 {m_solid:.0%} / 未做 None")
+
+    pool = [weak, solid, untouched] + sample[3:]
+    ordered = priority.order(pool, w.store.records, bank, _random.Random(7))
+    assert ordered[0].id in {weak.id, untouched.id}, ordered[0].id
+    assert ordered[-1].id == solid.id, [q.id for q in ordered]
+    ok(f"排序：薄弱题在前、已掌握题殿后（{ordered[0].id} → {ordered[-1].id}）")
+
+    # 同一知识点不连出：给同知识点的两题都设成薄弱，第三题来自别的知识点
+    pair = [q for q in bank.questions if q.knowledge == weak.knowledge][:2]
+    other = next(q for q in bank.questions
+                 if q.knowledge != weak.knowledge and q.id != solid.id)
+    for q in pair:
+        w.store.record(q.id, sorted(q.answer), False)
+    trio = priority.order(pair + [other], w.store.records, bank, _random.Random(3))
+    assert not (trio[0].knowledge == trio[1].knowledge == pair[0].knowledge), \
+        [q.id for q in trio]
+    ok("知识点分散：同一知识点不会连续出现")
+
+    # 记录里不再有按时间安排的字段
+    rec = w.store.get(weak.id)
+    assert "due" not in rec and "recent" in rec
+    assert w.session.weak_count() >= 2
+    ok(f"记录无时间字段，待巩固 {w.session.weak_count()} 题")
 
     print("[15] 字号三档")
     w._set_font_level("large")

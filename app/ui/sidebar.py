@@ -173,9 +173,9 @@ class Sidebar(QWidget):
             tp = self.session.filters.get("type")
             scope = {"single": "仅单选", "multiple": "仅多选"}.get(tp or "", "")
             if scope:
-                self.mode_hint.setText(f"随机抽题，范围：{scope}，优先未做过的题。")
+                self.mode_hint.setText(f"按掌握度与错误频率排序，范围：{scope}。")
             else:
-                self.mode_hint.setText("从全部题目中随机抽题，优先未做过的题。")
+                self.mode_hint.setText("按掌握度、错误频率与知识点覆盖排序，优先薄弱环节。")
         elif mode == "filter":
             self.mode_hint.setText("按章节 / 知识点 / 题型组合筛选，顺序练习。")
         else:

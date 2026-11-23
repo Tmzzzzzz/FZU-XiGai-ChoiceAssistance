@@ -4,8 +4,8 @@ from __future__ import annotations
 
 import random
 from dataclasses import dataclass
-from datetime import datetime
 
+from . import priority
 from .models import Bank, Question
 from .store import ProgressStore
 
@@ -65,54 +65,22 @@ class QuizSession:
     def rebuild(self, keep_current: bool = True) -> None:
         current = self.current.id if self.queue else None
         qs = self.candidates()
-        if self.mode == "random":
-            qs = self._memory_order(qs)
+        if self.mode in ("random", "wrong"):
+            qs = priority.order(qs, self.store.records, self.bank, self.rng)
         self.queue = [q.id for q in qs]
         if keep_current and current in self.queue:
             self.index = self.queue.index(current)
         else:
             self.index = 0
 
-    # ---------------------------------------------------------------- 复习调度
-    @staticmethod
-    def _is_due(rec: dict | None, now: datetime) -> bool:
-        if not rec:
-            return False
-        try:
-            return datetime.fromisoformat(str(rec.get("due"))) <= now
-        except (TypeError, ValueError):
-            return True
-
-    def _memory_order(self, qs: list[Question]) -> list[Question]:
-        """按记忆优先级分桶：到期错题 → 新题 → 到期旧题 → 未到期。
-
-        每桶内部打乱，保证同一个会话里不会出现固定顺序，但先做最该复习的。
-        """
-        now = datetime.now()
-        buckets: dict[int, list[Question]] = {0: [], 1: [], 2: [], 3: []}
-        for q in qs:
-            rec = self.store.records.get(q.id)
-            if rec is None:
-                buckets[1].append(q)
-            elif int(rec.get("wrong", 0)) > 0 and self._is_due(rec, now):
-                buckets[0].append(q)
-            elif self._is_due(rec, now):
-                buckets[2].append(q)
-            else:
-                buckets[3].append(q)
-        for group in buckets.values():
-            self.rng.shuffle(group)
-        return buckets[0] + buckets[1] + buckets[2] + buckets[3]
-
-    def due_count(self) -> int:
-        """已到复习时间、且此前作答过的题数。"""
-        now = datetime.now()
-        return sum(1 for qid, rec in self.store.records.items()
-                   if qid in self.bank.by_id and self._is_due(rec, now))
+    # ---------------------------------------------------------------- 掌握度
+    def weak_count(self) -> int:
+        """做过但掌握度低于目标值的题数（用于统计面板）。"""
+        return priority.weak_count(list(self.bank.questions), self.store.records)
 
     def reshuffle(self) -> None:
-        self.rng.shuffle(self.queue)
-        self.index = 0
+        """重新计算一次顺序（同分抖动不同，得到新的排法）。"""
+        self.rebuild(keep_current=True)
 
     # ---------------------------------------------------------------- 导航
     @property
@@ -173,7 +141,7 @@ class QuizSession:
 
         def key(qid: str):
             rec = self.store.records.get(qid, {})
-            return (-int(rec.get("wrong", 0)), str(rec.get("due", "")), order[qid])
+            return (-int(rec.get("wrong", 0)), -int(rec.get("attempts", 0)), order[qid])
 
         return sorted((i for i in ids if i in order), key=key)
 

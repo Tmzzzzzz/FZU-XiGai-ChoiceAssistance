@@ -55,6 +55,7 @@ class InsightsPanel(QWidget):
         lay.addWidget(self.coverage)
 
         self.due = QLabel("")
+        self.due.setToolTip("做过且掌握度低于 55% 的题数")
         self.due.setObjectName("hint")
         self.due.setAlignment(Qt.AlignCenter)
         lay.addWidget(self.due)
@@ -114,8 +115,8 @@ class InsightsPanel(QWidget):
         self.tile_right.set_value(st.correct)
         self.tile_wrong.set_value(st.wrong)
         self.coverage.setText(f"覆盖 {st.attempted} / {st.total} 题")
-        due = self.session.due_count()
-        self.due.setText(f"待复习 {due} 题" if due else "")
+        weak = self.session.weak_count()
+        self.due.setText(f"待巩固 {weak} 题" if weak else "")
         self.wrong_count.setText(f"{st.wrong} 题")
         self.wrong_count.set_kind("danger" if st.wrong else "success")
 

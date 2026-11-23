@@ -2,13 +2,12 @@
 """题目主视图：题干、选项、作答反馈。"""
 from __future__ import annotations
 
-from datetime import datetime
-
 from PySide6.QtCore import QRectF, Qt, QTimer, Signal
 from PySide6.QtGui import QColor, QLinearGradient, QPainter
 from PySide6.QtWidgets import (QFrame, QHBoxLayout, QLabel, QPushButton,
                                QScrollArea, QSizePolicy, QVBoxLayout, QWidget)
 
+from .. import priority
 from ..glossary import match_terms
 from ..models import Question
 from . import theme
@@ -52,6 +51,7 @@ class QuestionView(QWidget):
         super().__init__(parent)
         self.question: Question | None = None
         self._glossary: dict[str, str] = {}
+        self._bank = None
         self._rows: dict[str, OptionRow] = {}
         self._chosen: set[str] = set()
         self._locked = False
@@ -226,31 +226,19 @@ class QuestionView(QWidget):
         foot.addWidget(self.next_btn, 0)
         card.addLayout(foot)
 
-    def set_schedule(self, record: dict | None) -> None:
-        if not record or not record.get("due"):
+    def set_assessment(self, question: Question | None, record: dict | None) -> None:
+        """展示本题的掌握度与错误情况（纯计数，不含时间概念）。"""
+        if question is None or not record:
             self.fb_schedule.setVisible(False)
             return
-        try:
-            delta = datetime.fromisoformat(str(record["due"])) - datetime.now()
-        except (TypeError, ValueError):
-            self.fb_schedule.setVisible(False)
-            return
-        seconds = delta.total_seconds()
-        if seconds <= 0:
-            when = "现在"
-        elif seconds >= 82800:          # 接近或超过一天，按天显示
-            when = f"{max(1, round(seconds / 86400))} 天后"
-        elif seconds >= 3600:
-            when = f"{round(seconds / 3600)} 小时后"
-        else:
-            when = f"{max(1, round(seconds / 60))} 分钟后"
-        streak = int(record.get("streak", 0))
-        tail = f"｜连续答对 {streak} 次" if streak > 1 else ""
-        self.fb_schedule.setText(f"记忆安排：{when}复习{tail}")
+        self.fb_schedule.setText("本题评估：" + priority.explain(question, record))
         self.fb_schedule.setVisible(True)
 
     def set_glossary(self, glossary: dict[str, str]) -> None:
         self._glossary = dict(glossary or {})
+
+    def set_bank(self, bank) -> None:
+        self._bank = bank
 
     def _render_glossary(self, question: Question) -> None:
         while self.glossary_body.count():
@@ -326,7 +314,7 @@ class QuestionView(QWidget):
             self._locked = True
             self._chosen = set(chosen)
             self._paint_result(bool(record.get("correct")), chosen, record.get("attempts", 1))
-            self.set_schedule(record)
+            self.set_assessment(question, record)
 
     def _update_submit_state(self) -> None:
         self.submit_btn.setEnabled(bool(self._chosen) and not self._locked)

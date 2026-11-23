@@ -5,14 +5,12 @@ from __future__ import annotations
 import json
 import os
 import tempfile
-from datetime import datetime, timedelta
+from datetime import datetime
 from pathlib import Path
 from typing import Any
 
 
-# 连续答对后的复习间隔（天）与答错后的重练间隔（小时）
-REVIEW_INTERVALS = (1, 3, 7, 16, 35)
-RELEARN_HOURS = 6
+RECENT_WINDOW = 5   # 记录最近若干次作答，用于计算“最近正确率”
 
 
 class ProgressStore:
@@ -60,24 +58,18 @@ class ProgressStore:
 
     # ---------------------------------------------------------------- 记录
     def record(self, question_id: str, chosen: list[str], correct: bool) -> dict[str, Any]:
-        """记录一次作答，并按「连续答对次数」推算下次复习时间。"""
+        """记录一次作答：累计对错、连续答对与最近若干次结果（用于排序，不涉及时间）。"""
         old = _upgrade(self.records.get(question_id, {}))
-        now = datetime.now()
-        streak = int(old.get("streak", 0)) + 1 if correct else 0
-        if correct:
-            days = REVIEW_INTERVALS[min(max(streak, 1) - 1, len(REVIEW_INTERVALS) - 1)]
-            due = now + timedelta(days=days)
-        else:
-            due = now + timedelta(hours=RELEARN_HOURS)
+        recent = str(old.get("recent") or "") + ("1" if correct else "0")
         rec = {
             "attempts": int(old.get("attempts", 0)) + 1,
             "correct": bool(correct),
             "chosen": list(chosen),
-            "at": now.isoformat(timespec="seconds"),
+            "at": datetime.now().isoformat(timespec="seconds"),
             "wrong": int(old.get("wrong", 0)) + (0 if correct else 1),
             "right": int(old.get("right", 0)) + (1 if correct else 0),
-            "streak": streak,
-            "due": due.isoformat(timespec="seconds"),
+            "streak": int(old.get("streak", 0)) + 1 if correct else 0,
+            "recent": recent[-RECENT_WINDOW:],
         }
         self.records[question_id] = rec
         return rec
@@ -98,8 +90,9 @@ class ProgressStore:
 
 
 def _upgrade(rec: dict[str, Any]) -> dict[str, Any]:
-    """兼容 v1 记录：补齐错误次数、连续答对与到期时间。"""
+    """兼容旧记录：补齐次数与最近结果；旧的 due 字段直接丢弃。"""
     out = dict(rec)
+    out.pop("due", None)
     if not out:
         return out
     if "wrong" not in out:
@@ -108,12 +101,6 @@ def _upgrade(rec: dict[str, Any]) -> dict[str, Any]:
         out["right"] = 1 if out.get("correct") else 0
     if "streak" not in out:
         out["streak"] = 1 if out.get("correct") else 0
-    if "due" not in out:
-        try:
-            base = datetime.fromisoformat(str(out.get("at")))
-        except (TypeError, ValueError):
-            base = datetime.now()
-        days = REVIEW_INTERVALS[min(max(out["streak"], 1) - 1, len(REVIEW_INTERVALS) - 1)]
-        out["due"] = (base + (timedelta(days=days) if out.get("correct")
-                               else timedelta(hours=RELEARN_HOURS))).isoformat(timespec="seconds")
+    if "recent" not in out:
+        out["recent"] = "1" if out.get("correct") else "0"
     return out

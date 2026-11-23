@@ -147,6 +147,7 @@ class MainWindow(QMainWindow):
 
         self.view = QuestionView()
         self.view.set_glossary(self.bank.glossary)
+        self.view.set_bank(self.bank)
         self.stack.addWidget(self.view)
 
         # 空状态页
@@ -249,7 +250,7 @@ class MainWindow(QMainWindow):
         correct = self.session.submit(chosen)
         record = self.session.state_of(q.id) or {}
         self.view.mark_submitted(chosen, correct, record.get("attempts", 1))
-        self.view.set_schedule(record)
+        self.view.set_assessment(q, record)
         self.view.set_nav(self.session.index > 0, self.session.index + 1 < self.session.total)
         self.insights.refresh()
         self.sidebar.refresh()
@@ -386,7 +387,7 @@ class MainWindow(QMainWindow):
             tp = self.session.filters.get("type")
             if tp:
                 parts.append("范围：" + ("单选题" if tp == "single" else "多选题"))
-            parts.append("优先到期复习与未做过的题")
+            parts.append("按掌握度与错误频率排序")
         st = self.session.stats()
         parts.append(f"已做 {st.attempted}/{st.total}")
         self.page_sub.setText("　·　".join(parts))
