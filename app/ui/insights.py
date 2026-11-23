@@ -19,7 +19,7 @@ class InsightsPanel(QWidget):
         super().__init__(parent)
         self.session = session
         self._wrong_ids: list[str] = []
-        self.setFixedWidth(316)
+        self.setFixedWidth(self._width_for_font())
 
         outer = QVBoxLayout(self)
         outer.setContentsMargins(0, 0, 0, 0)
@@ -108,6 +108,13 @@ class InsightsPanel(QWidget):
         self.refresh()
 
     # ---------------------------------------------------------------- 刷新
+    @staticmethod
+    def _width_for_font() -> int:
+        return int(316 * theme.layout_scale())
+
+    def apply_font_scale(self) -> None:
+        self.setFixedWidth(self._width_for_font())
+
     def refresh(self) -> None:
         st = self.session.stats()
         self.ring.set_value(st.accuracy, f"{st.accuracy * 100:.0f}%", "正确率")

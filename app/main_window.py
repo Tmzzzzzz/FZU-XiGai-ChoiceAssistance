@@ -455,6 +455,9 @@ class MainWindow(QMainWindow):
         app.setFont(theme.base_font(10))
         app.setPalette(theme.app_palette())
         app.setStyleSheet(theme.qss())
+        for panel in (self.sidebar, self.insights):
+            if hasattr(panel, "apply_font_scale"):
+                panel.apply_font_scale()
         for widget in app.allWidgets():
             widget.style().unpolish(widget)
             widget.style().polish(widget)

@@ -142,7 +142,7 @@ DARK = {
     "SUN": "#F0BE69",
 }
 
-FONT_SCALES = {"small": 0.88, "medium": 1.0, "large": 1.16}
+FONT_SCALES = {"small": 0.84, "medium": 1.0, "large": 1.30}
 FONT_LABELS = {"small": "小", "medium": "中", "large": "大"}
 
 _current = dict(LIGHT)
@@ -166,6 +166,11 @@ def font_level() -> str:
 
 def font_scale() -> float:
     return _font_scale
+
+
+def layout_scale() -> float:
+    """固定宽度控件（侧栏、统计面板）随字号放大，但只放大一半幅度。"""
+    return 1.0 + max(0.0, _font_scale - 1.0) * 0.5
 
 
 def set_font_scale(level: str) -> None:

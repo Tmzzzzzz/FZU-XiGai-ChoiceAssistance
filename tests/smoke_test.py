@@ -242,11 +242,13 @@ def main():
     print("[15] 字号三档")
     w._set_font_level("large")
     app.processEvents()
-    assert theme.font_level() == "large" and "15.1pt" in app.styleSheet()
+    big = f"{round(13 * theme.FONT_SCALES['large'], 1)}pt"
+    assert theme.font_level() == "large" and big in app.styleSheet(), big
     w._flush()
     assert ProgressStore(p).get_pref("font_scale") == "large"
     w._set_font_level("small")
-    assert "11.4pt" in app.styleSheet()
+    small = f"{round(13 * theme.FONT_SCALES['small'], 1)}pt"
+    assert small in app.styleSheet(), small
     w._set_font_level("medium")
     ok("大 / 中 / 小切换生效并写入偏好")
 

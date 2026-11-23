@@ -7,6 +7,7 @@ from PySide6.QtWidgets import (QFrame, QHBoxLayout, QLabel, QPushButton,
                                QScrollArea, QVBoxLayout, QWidget)
 
 from ..session import MODES, QuizSession
+from . import theme
 from .widgets import BrandMark, Chip, HLine, Segmented, Select
 
 
@@ -19,7 +20,7 @@ class Sidebar(QWidget):
         super().__init__(parent)
         self.session = session
         self.setObjectName("sidebar")
-        self.setFixedWidth(272)
+        self.setFixedWidth(self._width_for_font())
 
         outer = QVBoxLayout(self)
         outer.setContentsMargins(0, 0, 0, 0)
@@ -161,6 +162,13 @@ class Sidebar(QWidget):
         self.refresh()
 
     # ---------------------------------------------------------------- 刷新
+    @staticmethod
+    def _width_for_font() -> int:
+        return int(272 * theme.layout_scale())
+
+    def apply_font_scale(self) -> None:
+        self.setFixedWidth(self._width_for_font())
+
     def refresh(self) -> None:
         mode = self.session.mode
         self.segmented.set_index(MODES.index(mode))
